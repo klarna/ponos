@@ -1,0 +1,9 @@
+ebin/
+/.eunit/
+/.rebar/
+doc/edoc-info
+doc/*.html
+doc/*.png
+doc/*.css
+dialyzer.plt
+deps/dialyzer.plt
