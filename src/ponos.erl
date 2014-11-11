@@ -70,8 +70,10 @@
 %% @doc Add load generators to ponos. If a load generator with the same
 %% name is added twice, the original one *won't* be overwritten.
 %% @end
-add_load_generators(Args) ->
-  [add_load_generator(Arg) || Arg <- Args].
+add_load_generators([H|_] = Args) when is_list(H) ->
+  [add_load_generator(Arg) || Arg <- Args];
+add_load_generators([H|_] = Args) when is_tuple(H) ->
+  add_load_generators([Args]).
 
 -spec add_load_generator(args()) -> ok | {error, {duplicated, name()}}.
 %% @private
@@ -100,7 +102,9 @@ init_load_generators() ->
 %% initialized generators will be ignored.
 %% @end
 init_load_generators(Names) when is_list(Names) ->
-  [init_load_generator(Name) || Name <- Names].
+  [init_load_generator(Name) || Name <- Names];
+init_load_generators(Name) when is_atom(Name) ->
+  init_load_generators([Name]).
 
 -spec init_load_generator(name()) -> ok
                                      | {error, {non_existing, name()}}
@@ -128,7 +132,9 @@ pause_load_generators() ->
 %% `Names'. Already paused load generators will be ignored.
 %% @end
 pause_load_generators(Names) when is_list(Names) ->
-  [pause_load_generator(Name) || Name <- Names].
+  [pause_load_generator(Name) || Name <- Names];
+pause_load_generators(Name) when is_atom(Name) ->
+  pause_load_generators([Name]).
 
 -spec pause_load_generator(name()) -> ok | {error, {non_existing, name()}}.
 %% @private
@@ -146,8 +152,10 @@ remove_load_generators() ->
 %% @doc Stop generating load for load generators and remove them from
 %% ponos.
 %% @end
-remove_load_generators(Names) ->
-  [remove_load_generator(Name) || Name <- Names].
+remove_load_generators(Names) when is_list(Names) ->
+  [remove_load_generator(Name) || Name <- Names];
+remove_load_generators(Name) when is_atom(Name) ->
+  remove_load_generators([Name]).
 
 -spec remove_load_generator(name()) -> ok | {error, {non_existing, name()}}.
 %% @private
