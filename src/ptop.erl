@@ -23,7 +23,8 @@
 -module(ptop).
 
 %%%_* Exports ==========================================================
--export([ start/0
+-export([ pp/0
+        , start/0
         , stop/0
         ]).
 
@@ -33,12 +34,27 @@
 
 %%%_* Code =============================================================
 %%%_* External API -----------------------------------------------------
+%% @doc Start a process calling {@link pp/0} every 2 seconds.
 start() ->
   start(ptop).
 
+%% @doc Stop the process calling {@link pp/0} every 2 seconds.
 stop() ->
   stop(ptop).
 
+-spec pp() -> ok.
+%% @doc Pretty print current status of ponos. This is useful for getting
+%% information on what load generators are added, their current load,
+%% etc.
+%% @end
+pp() ->
+  AllTop = ponos:top(),
+  pp_procs(),
+  pp_ports(),
+  pp_header(),
+  pp_load_generators(AllTop),
+  pp_total(AllTop),
+  pp_dividor("=").
 
 %%%_* Internal API -----------------------------------------------------
 start(Name) ->
@@ -82,20 +98,6 @@ loop(Name) ->
     {Stopper, stop} ->
       Stopper ! {stopped, Name}
   end.
-
--spec pp() -> ok.
-%% @doc Pretty print current status of ponos. This is useful for getting
-%% information on what load generators are added, their current load,
-%% etc.
-%% @end
-pp() ->
-  AllTop = ponos:top(),
-  pp_procs(),
-  pp_ports(),
-  pp_header(),
-  pp_load_generators(AllTop),
-  pp_total(AllTop),
-  pp_dividor("=").
 
 %% @private
 pp_procs() ->
