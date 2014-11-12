@@ -26,6 +26,15 @@ add_and_remove_load_gens_test_() ->
                       end)
    ]}.
 
+add_single_load_gen_test_() ->
+  LoadGen = mk_constant_load_gen(name1),
+  {setup,
+   fun setup_test_case/0,
+   fun teardown_test_case/1,
+   [ ?_assertEqual([ok], ponos:add_load_generators(LoadGen))
+   , ?_assert(lists:keymember(name1, 1, ponos:top()))
+   ]}.
+
 auto_init_true_test_() ->
   {setup,
    fun setup_test_case/0,
@@ -127,6 +136,20 @@ pause_load_generators_test_() ->
        ]
    end}.
 
+pause_single_load_generator_test_() ->
+  {setup,
+   fun() ->
+       setup([name1, name2], [{auto_init, true}])
+   end,
+   fun teardown_test_case/1,
+   fun(_) ->
+       [ ?_assertEqual(true, ponos:is_running(name1))
+       , ?_assertEqual([ok], ponos:pause_load_generators(name1))
+       , ?_assertEqual(false, ponos:is_running(name1))
+       , ?_assertEqual(true, ponos:is_running(name2))
+       ]
+   end}.
+
 remove_multiple_generators_test_() ->
   {setup,
    fun() -> setup([name1, name2, name3], []) end,
@@ -158,6 +181,18 @@ remove_all_generators_test_() ->
        ]
    end}.
 
+remove_single_load_generator_test_() ->
+  {setup,
+   fun() -> setup([name1, name2], []) end,
+   fun teardown_test_case/1,
+   fun(_) ->
+       [ ?_assertEqual(2, length(ponos:get_load_generators()))
+       , ?_assertEqual([ok], ponos:remove_load_generators(name2))
+       , ?_assert(lists:keymember(name1, 1, ponos:top()))
+       , ?_assertNot(lists:keymember(name2, 1, ponos:top()))
+       ]
+   end}.
+
 init_multiple_test_() ->
   {setup,
    fun() ->
@@ -169,6 +204,19 @@ init_multiple_test_() ->
        [ ?_assertEqual(true, ponos:is_running(name1))
        , ?_assertEqual(true, ponos:is_running(name2))
        , ?_assertEqual(false, ponos:is_running(name3))
+       ]
+   end}.
+
+init_single_test_() ->
+  {setup,
+   fun() ->
+       setup([name1, name2], [{auto_init, false}]),
+       ponos:init_load_generators(name1)
+   end,
+   fun teardown_test_case/1,
+   fun(_) ->
+       [ ?_assertEqual(true, ponos:is_running(name1))
+       , ?_assertEqual(false, ponos:is_running(name2))
        ]
    end}.
 

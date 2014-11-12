@@ -83,6 +83,9 @@ Options:
 * `task_runner_args` - Defaults to `[]`. May be of type any(). The value
   is passed to the `task_runner`'s `init` function.
 
+For convenience, all operations on load generators permits referring to
+a single load generator or a list of generators.
+
 ## <a name="ponos_load_specs"></a> ponos_load_specs
 
 This module provides a set of predefined constructors for typical load
