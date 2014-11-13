@@ -56,9 +56,9 @@ ponos_serv_child_spec() ->
    permanent, 3600, worker, [ponos_serv]}.
 
 load_generator_sup_child_spec() ->
-  {load_generator_sup,
-   {load_generator_sup, start_link, []},
-   permanent, 3600, supervisor, [load_generator_sup]}.
+  {ponos_load_generator_sup,
+   {ponos_load_generator_sup, start_link, []},
+   permanent, 3600, supervisor, [ponos_load_generator_sup]}.
 
 %%%_* Emacs ============================================================
 %%% Local Variables:

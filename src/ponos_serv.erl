@@ -182,17 +182,19 @@ start_and_monitor_load_generator(Name, Task, LoadSpec, Options) ->
   Duration      = proplists:get_value(duration, Options),
   TaskRunner    = proplists:get_value(task_runner, Options),
   Args          = proplists:get_value(task_runner_args, Options),
-  {ok, LoadGen} = load_generator_sup:start_child([ {name, Name}
-                                                 , {task, Task}
-                                                 , {load_spec, LoadSpec}
-                                                 , {duration, Duration}
-                                                 , {task_runner, TaskRunner}
-                                                 , {task_runner_args, Args}
-                                                 ]),
+  {ok, LoadGen} =
+    ponos_load_generator_sup:start_child([ {name, Name}
+                                         , {task, Task}
+                                         , {load_spec, LoadSpec}
+                                         , {duration, Duration}
+                                         , {task_runner, TaskRunner}
+                                         , {task_runner_args, Args}
+                                         ]),
   {LoadGen, erlang:monitor(process, LoadGen)}.
 
 server_get_duration(Name, State) ->
-  {reply, load_generator:get_duration(fetch_load_generator(Name, State)),State}.
+  LoadGen = fetch_load_generator(Name, State),
+  {reply, ponos_load_generator:get_duration(LoadGen),State}.
 
 server_get_load_generators(State) ->
   {reply, mk_load_generators_list(State), State}.
@@ -201,11 +203,12 @@ mk_load_generators_list(State) ->
   orddict:fold(fun collect_top_and_name_for/3, [], get_load_generators(State)).
 
 collect_top_and_name_for(Name, {LoadGenPid, _Ref}, Acc) ->
-  LoadGenerator = [{name, Name}|load_generator:top(LoadGenPid)],
+  LoadGenerator = [{name, Name}|ponos_load_generator:top(LoadGenPid)],
   [LoadGenerator|Acc].
 
 server_get_start(Name, State) ->
-  {reply, load_generator:get_start(fetch_load_generator(Name, State)), State}.
+  LoadGen = fetch_load_generator(Name, State),
+  {reply, ponos_load_generator:get_start(LoadGen), State}.
 
 server_init_load(Name, State) ->
   Fun = fun() -> maybe_start_load_generator(Name, State) end,
@@ -213,7 +216,7 @@ server_init_load(Name, State) ->
 
 maybe_start_load_generator(Name, State) ->
   {LoadGen, Ref} = fetch_load_generator_with_ref(Name, State),
-  case load_generator:is_running(LoadGen) of
+  case ponos_load_generator:is_running(LoadGen) of
     false ->
       NewLoadGen = start_load_generator(LoadGen),
       {reply, ok, store_load_generator(Ref, NewLoadGen, State)};
@@ -222,20 +225,20 @@ maybe_start_load_generator(Name, State) ->
   end.
 
 start_load_generator(LoadGen) ->
-  _NewLoadGen = load_generator:start(LoadGen).
+  _NewLoadGen = ponos_load_generator:start(LoadGen).
 
 server_is_running(Name, State) ->
   Fun = fun() ->
             LoadGen = fetch_load_generator(Name, State),
-            {reply, load_generator:is_running(LoadGen), State}
+            {reply, ponos_load_generator:is_running(LoadGen), State}
         end,
   execute_on_existing(Name, Fun, State).
 
 server_pause(Name, State) ->
   Fun = fun() ->
             LoadGen = fetch_load_generator(Name, State),
-            case load_generator:is_running(LoadGen) of
-              true  -> {reply, load_generator:pause(LoadGen), State};
+            case ponos_load_generator:is_running(LoadGen) of
+              true  -> {reply, ponos_load_generator:pause(LoadGen), State};
               false -> {reply, ok, State}
             end
         end,
@@ -249,7 +252,7 @@ server_remove_load_generator(Name, State) ->
   execute_on_existing(Name, Fun, State).
 
 shutdown_load_generator(LoadGen) ->
-  load_generator:stop(LoadGen).
+  ponos_load_generator:stop(LoadGen).
 
 server_top(State) ->
   AllTop = top_for_all_running_load_gens(State),
@@ -258,7 +261,7 @@ server_top(State) ->
 
 top_for_all_running_load_gens(State) ->
   Fun = fun(_Key, {LoadGenPid, _}) ->
-            load_generator:top(LoadGenPid)
+            ponos_load_generator:top(LoadGenPid)
         end,
   orddict:map(Fun, get_load_generators(State)).
 
@@ -291,7 +294,7 @@ update_running_tasks(TopStats, Acc) ->
 
 update_modeled_load(LoadGen, TopStats, State, Acc) ->
   LoadGenPid = fetch_load_generator(LoadGen, State),
-  case load_generator:is_running(LoadGenPid) of
+  case ponos_load_generator:is_running(LoadGenPid) of
     true ->
       {_, IncrementModeled} = lists:keyfind(modeled_load, 1, TopStats),
       orddict:update_counter(modeled_load, IncrementModeled, Acc);
@@ -340,7 +343,7 @@ monitor_to_load_gen_name(MonitorRef, #state{load_generators = LoadGens}) ->
 
 store_load_generator(Monitor, LoadGenPid, State = #state{}) ->
   LoadGens = State#state.load_generators,
-  Name     = load_generator:get_name(LoadGenPid),
+  Name     = ponos_load_generator:get_name(LoadGenPid),
   LoadGen  = {LoadGenPid, Monitor},
   State#state{load_generators = orddict:store(Name, LoadGen, LoadGens)}.
 

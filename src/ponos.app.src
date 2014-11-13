@@ -21,7 +21,7 @@
  , {registered,  [ ponos_event_manager
                  , ponos_sup
                  , ponos_serv
-                 , load_generator_sup
+                 , ponos_load_generator_sup
                  ]}
  , {applications, [ kernel
                   , stdlib]}

@@ -6,7 +6,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% Module Declaration =================================================
--module(load_generator_tests).
+-module(ponos_load_generator_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -21,10 +21,10 @@ load_generator_basic_test_() ->
    fun() -> basic_setup(Name, Task, LoadSpec, Duration) end,
    fun(LoadGen) -> basic_teardown(LoadGen) end,
    fun(LoadGen) ->
-       [ ?_assertEqual(Name,     load_generator:get_name(LoadGen))
-       , ?_assertEqual(Task,     load_generator:get_task(LoadGen))
-       , ?_assertEqual(LoadSpec, load_generator:get_load_spec(LoadGen))
-       , ?_assertEqual(Duration, load_generator:get_duration(LoadGen))
+       [ ?_assertEqual(Name,     ponos_load_generator:get_name(LoadGen))
+       , ?_assertEqual(Task,     ponos_load_generator:get_task(LoadGen))
+       , ?_assertEqual(LoadSpec, ponos_load_generator:get_load_spec(LoadGen))
+       , ?_assertEqual(Duration, ponos_load_generator:get_duration(LoadGen))
        ]
    end}.
 
@@ -33,10 +33,10 @@ load_generator_is_running_test_() ->
    fun() -> basic_setup() end,
    fun(LoadGen) -> basic_teardown(LoadGen) end,
    fun(LoadGen) ->
-       [ ?_assertEqual(false, load_generator:is_running(LoadGen))
+       [ ?_assertEqual(false, ponos_load_generator:is_running(LoadGen))
        , ?_assertEqual(true, begin
-                                 load_generator:start(LoadGen),
-                                 load_generator:is_running(LoadGen)
+                                 ponos_load_generator:start(LoadGen),
+                                 ponos_load_generator:is_running(LoadGen)
                              end)
        ]
    end}.
@@ -45,20 +45,20 @@ load_generator_pause_test_() ->
   {setup,
    fun() ->
        LoadGen = basic_setup(),
-       load_generator:start(LoadGen),
+       ponos_load_generator:start(LoadGen),
        LoadGen
    end,
    fun(LoadGen) -> basic_teardown(LoadGen) end,
    fun(LoadGen) ->
-       [ ?_assertEqual(true, load_generator:is_running(LoadGen))
+       [ ?_assertEqual(true, ponos_load_generator:is_running(LoadGen))
        , ?_assertEqual(false, begin
-                                load_generator:pause(LoadGen),
-                                load_generator:is_running(LoadGen)
+                                ponos_load_generator:pause(LoadGen),
+                                ponos_load_generator:is_running(LoadGen)
                               end)
        , ?_assertEqual(true,
                        begin
-                         load_generator:start(LoadGen),
-                         load_generator:is_running(LoadGen)
+                         ponos_load_generator:start(LoadGen),
+                         ponos_load_generator:is_running(LoadGen)
                        end)
        ]
    end}.
@@ -78,12 +78,12 @@ basic_setup(Name, Task, LoadSpec, Duration) ->
          , {task_runner, ponos_default_task_runner}
          , {task_runner_args, []}
          ],
-  {ok, LoadGen} = load_generator:start_link(Args),
+  {ok, LoadGen} = ponos_load_generator:start_link(Args),
   LoadGen.
 
 basic_teardown(LoadGen) ->
   unlink(LoadGen),
-  ok = load_generator:stop(LoadGen).
+  ok = ponos_load_generator:stop(LoadGen).
 
 
 %%%_* Emacs ============================================================
