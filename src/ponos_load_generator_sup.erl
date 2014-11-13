@@ -21,7 +21,7 @@
 
 %%%_* Module Declaration ===============================================
 %%% @private
--module(load_generator_sup).
+-module(ponos_load_generator_sup).
 -behaviour(supervisor).
 
 %%%_* Exports ==========================================================
@@ -55,8 +55,8 @@ child_specs() ->
 
 load_generator_sup_child_spec() ->
   {load_generator_sup,
-   {load_generator, start_link, []},
-   transient, 3600, worker, [load_generator]}.
+   {ponos_load_generator, start_link, []},
+   transient, 3600, worker, [ponos_load_generator]}.
 
 %%%_* Emacs ============================================================
 %%% Local Variables:

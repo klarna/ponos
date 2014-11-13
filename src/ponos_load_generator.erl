@@ -21,7 +21,7 @@
 
 %%%_* Module Declaration ===============================================
 %% @private
--module(load_generator).
+-module(ponos_load_generator).
 -behaviour(gen_server).
 
 -include_lib("eunit/include/eunit.hrl").
