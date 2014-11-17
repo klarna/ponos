@@ -8,7 +8,9 @@
 ## Description
 
 Ponos is an Erlang application that exposes a flexible load generator
-API.
+API. Ponos [[1](#ref1)] is named after the Greek god of hard labor and
+toil
+([http://en.wikipedia.org/wiki/Ponos](http://en.wikipedia.org/wiki/Ponos)).
 
 Written by Jonathan Olsson <jonathan@klarna.com> with contributions from
 Cons Åhs <cons@klarna.com>
@@ -142,3 +144,9 @@ Please refer to `ponos_default_task_runner.erl` and
 ## Versioning
 
 Ponos is versioned according to [semantic versioning](http://semver.org/).
+
+## Notes
+
+<a name="ref1"></a>[1] The author is aware of the Russian meaning of the
+word *ponos*. I leave it to the Russian to fight this down with the
+Greek. Needless to say, a suitable name is a suitable name.
