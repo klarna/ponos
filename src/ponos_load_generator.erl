@@ -268,9 +268,30 @@ maybe_trigger_task(TimePassed, State) ->
       {ok, State}
   end.
 
+get_next_action(TimePassed, State) ->
+  TriggerTime = state_get_next_trigger_time(State),
+  Intensity   = state_get_intensity(State),
+  case should_trigger_task(TimePassed, TriggerTime, Intensity) of
+    true  -> trigger_task;
+    false -> skip
+  end.
+
+should_trigger_task(_TimePased, _TriggerTime, Intensity) when Intensity == 0 ->
+  false;
+should_trigger_task(TimePassed, TriggerTime, _Intensity) ->
+  TimePassed >= TriggerTime.
+
 trigger_task_and_update_counters(_TimePassed, State) ->
   run_task(State),
   update_next_trigger_time(update_counters(State)).
+
+run_task(State) ->
+  spawn_link(fun() -> run_task(State, state_get_task(State)) end).
+
+run_task(State, Task) ->
+  {TaskRunner, RunnerState} = state_get_task_runner(State),
+  Name                      = state_get_name(State),
+  ponos_task_runner_callbacks:call(TaskRunner, Name, Task, RunnerState).
 
 update_counters(State) ->
   State1 = state_inc_call_counter(State),
@@ -343,29 +364,8 @@ calc_top_modeled_load(State) ->
 time_passed_in_ms(Now, Then) ->
   round(timer:now_diff(Now, Then) / 1000).
 
-get_next_action(TimePassed, State) ->
-  TriggerTime = state_get_next_trigger_time(State),
-  Intensity   = state_get_intensity(State),
-  case should_trigger_task(TimePassed, TriggerTime, Intensity) of
-    true  -> trigger_task;
-    false -> skip
-  end.
-
-run_task(State) ->
-  spawn_link(fun() -> run_task(State, state_get_task(State)) end).
-
-run_task(State, Task) ->
-  {TaskRunner, RunnerState} = state_get_task_runner(State),
-  Name                      = state_get_name(State),
-  ponos_task_runner_callbacks:call(TaskRunner, Name, Task, RunnerState).
-
 intensity_ms(Seconds) ->
   Seconds / 1000.
-
-should_trigger_task(_TimePased, _TriggerTime, Intensity) when Intensity == 0 ->
-  false;
-should_trigger_task(TimePassed, TriggerTime, _Intensity) ->
-  TimePassed >= TriggerTime.
 
 %% State accessors -----------------------------------------------------
 state_get_call_counter(#state{call_counter = CallCounter})    -> CallCounter.
