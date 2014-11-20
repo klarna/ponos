@@ -83,6 +83,7 @@ mk_options(Options) ->
 default_options() ->
   [ {auto_init, false}
   , {duration, infinity}
+  , {max_concurrent, 0}
   , {task_runner, ponos_default_task_runner}
   , {task_runner_args, []}
   ].
@@ -182,11 +183,13 @@ start_and_monitor_load_generator(Name, Task, LoadSpec, Options) ->
   Duration      = proplists:get_value(duration, Options),
   TaskRunner    = proplists:get_value(task_runner, Options),
   Args          = proplists:get_value(task_runner_args, Options),
+  MaxConcurrent = proplists:get_value(max_concurrent, Options),
   {ok, LoadGen} =
     ponos_load_generator_sup:start_child([ {name, Name}
                                          , {task, Task}
                                          , {load_spec, LoadSpec}
                                          , {duration, Duration}
+                                         , {max_concurrent, MaxConcurrent}
                                          , {task_runner, TaskRunner}
                                          , {task_runner_args, Args}
                                          ]),

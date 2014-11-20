@@ -87,6 +87,7 @@ basic_setup(Name, Task, LoadSpec, Duration) ->
   Args = [ {name, Name}
          , {task, Task}
          , {load_spec, LoadSpec}
+         , {max_concurrent, 0}
          , {duration, Duration}
          , {task_runner, ponos_default_task_runner}
          , {task_runner_args, []}

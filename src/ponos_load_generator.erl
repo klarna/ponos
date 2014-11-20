@@ -53,6 +53,7 @@
           duration          :: ponos:duration(),
           is_running        :: boolean(),
           load_spec         :: ponos:load_spec(),
+          max_concurrent    :: integer(),
           name              :: ponos:name(),
           next_trigger_time :: number(),
           intensities       :: list(erlang:now()),
@@ -111,9 +112,10 @@ top(LoadGenerator) ->
 %%%_* gen_server callbacks ---------------------------------------------
 init(Args) ->
   process_flag(trap_exit, true),
-  Name       = element(2, proplists:lookup(name, Args)),
-  TaskRunner = element(2, proplists:lookup(task_runner, Args)),
-  RunnerArgs = element(2, proplists:lookup(task_runner_args, Args)),
+  Name          = element(2, proplists:lookup(name, Args)),
+  TaskRunner    = element(2, proplists:lookup(task_runner, Args)),
+  RunnerArgs    = element(2, proplists:lookup(task_runner_args, Args)),
+  MaxConcurrent = element(2, proplists:lookup(max_concurrent, Args)),
 
   {ok, State} = ponos_task_runner_callbacks:init(TaskRunner, Name, RunnerArgs),
   {ok, #state{
@@ -121,6 +123,7 @@ init(Args) ->
           duration          = element(2, proplists:lookup(duration, Args)),
           load_spec         = element(2, proplists:lookup(load_spec, Args)),
           is_running        = false,
+          max_concurrent    = MaxConcurrent,
           name              = Name,
           next_trigger_time = 0,
           intensities       = [],
@@ -160,18 +163,49 @@ handle_cast(_Request, State) ->
 handle_info({'EXIT', _Pid, _Reason}, State) ->
   {noreply, state_dec_running_tasks(State)};
 handle_info(tick, State) ->
-  Duration = state_get_duration(State),
   Start = state_get_start(State),
   TimePassed = time_passed_in_ms(os:timestamp(), Start),
-  case duration_is_not_exceeded(Duration, TimePassed) of
-    true  ->
+  case status(TimePassed, State) of
+    skip ->
       tick(),
-      {ok, NewState0} = dispatch_tick(TimePassed, State),
-      {noreply, state_inc_tick_counter(NewState0)};
-    false -> {stop, {shutdown, duration_exceeded}, State}
+      skip(State);
+    trigger_task ->
+      tick(),
+      NewState = dispatch_trigger_task(TimePassed, State),
+      {noreply, NewState};
+    duration_exceeded ->
+      {stop, {shutdown, duration_exceeded}, State};
+    max_concurrency_reached ->
+      tick(),
+      skip(State);
+    paused ->
+      tick(),
+      skip(State)
   end;
 handle_info(_Info, State) ->
   {noreply, State}.
+
+skip(State) ->
+  {noreply, maybe_prune_intensities(state_inc_tick_counter(State))}.
+
+status(TimePassed, State) ->
+  Duration              = state_get_duration(State),
+  DurationIsExceeded    = duration_is_exceeded(Duration, TimePassed),
+  MaxConcurrencyReached = is_max_concurrency_reached(State),
+  IsPaused              = not state_get_is_running(State),
+  ShouldTriggerTask     = get_next_action(TimePassed, State) == trigger_task,
+
+  %% Please be aware that the ordering of conditions is
+  %% important. DurationIsExceeded must come first as the load_generator
+  %% must stop if its in this status. Likewise, MaxConcurrencyReached
+  %% and IsPaused must override ShouldTriggerTask.
+  if
+    DurationIsExceeded    -> duration_exceeded;
+    MaxConcurrencyReached -> max_concurrency_reached;
+    IsPaused              -> paused;
+    ShouldTriggerTask     -> trigger_task;
+    true                  -> skip
+  end.
 
 terminate(shutdown, State) ->
   dispatch_terminate(shutdown, State);
@@ -188,6 +222,9 @@ code_change(_OldVsn, LoadGenerator, _Extra) ->
   {ok, LoadGenerator}.
 
 %%%_* gen_server dispatch ----------------------------------------------
+dispatch_trigger_task(TimePassed, State) ->
+  _NewState  = trigger_task_and_update_counters(TimePassed, State).
+
 dispatch_pause(State) ->
   {TaskRunner, S} = state_get_task_runner(State),
   ponos_task_runner_callbacks:pause(TaskRunner, state_get_name(State), S),
@@ -207,15 +244,6 @@ dispatch_terminate(_Reason, State) ->
   Name            = state_get_name(State),
   ponos_task_runner_callbacks:terminate(TaskRunner, Name, S),
   ok.
-
-dispatch_tick(TimePassed, State) ->
-  case state_get_is_running(State) of
-    true ->
-      {ok, NewState} = maybe_trigger_task(TimePassed, State),
-      {ok, update_intensity(TimePassed, maybe_prune_intensities(NewState))};
-    false ->
-      {ok, maybe_prune_intensities(State)}
-  end.
 
 dispatch_top(State) ->
   Intensities = state_get_intensities(State),
@@ -257,16 +285,13 @@ do_prune_intensities(State) ->
   NewIntensities = lists:takewhile(Fun, Intensities),
   state_set_intensities(State, NewIntensities).
 
-duration_is_not_exceeded(Duration, TimePassed) ->
-  (Duration == infinity) or (Duration > TimePassed).
+duration_is_exceeded(Duration, TimePassed) ->
+  (Duration =/= infinity) andalso (TimePassed >= Duration).
 
-maybe_trigger_task(TimePassed, State) ->
-  case get_next_action(TimePassed, State) of
-    trigger_task ->
-      {ok, trigger_task_and_update_counters(TimePassed, State)};
-    skip ->
-      {ok, State}
-  end.
+is_max_concurrency_reached(State) ->
+  MaxConcurrent = state_get_max_concurrent(State),
+  NoConcurrent  = state_get_running_tasks(State),
+  MaxConcurrent /= 0 andalso NoConcurrent >= MaxConcurrent.
 
 get_next_action(TimePassed, State) ->
   TriggerTime = state_get_next_trigger_time(State),
@@ -281,9 +306,13 @@ should_trigger_task(_TimePased, _TriggerTime, Intensity) when Intensity == 0 ->
 should_trigger_task(TimePassed, TriggerTime, _Intensity) ->
   TimePassed >= TriggerTime.
 
-trigger_task_and_update_counters(_TimePassed, State) ->
+trigger_task_and_update_counters(TimePassed, State) ->
   run_task(State),
-  update_next_trigger_time(update_counters(State)).
+  NewState1 = state_inc_tick_counter(State),
+  NewState2 = maybe_prune_intensities(NewState1),
+  NewState3 = update_intensity(TimePassed, NewState2),
+  NewState4 = update_counters(NewState3),
+  update_next_trigger_time(NewState4).
 
 run_task(State) ->
   spawn_link(fun() -> run_task(State, state_get_task(State)) end).
@@ -374,6 +403,7 @@ state_get_intensities(#state{intensities = Intensities})      -> Intensities.
 state_get_intensity(#state{intensity = Intensity})            -> Intensity.
 state_get_is_running(#state{is_running = IsRunning})          -> IsRunning.
 state_get_load_spec(#state{load_spec = LoadSpec})             -> LoadSpec.
+state_get_max_concurrent(#state{max_concurrent = MaxCon})     -> MaxCon.
 state_get_name(#state{name = Name})                           -> Name.
 state_get_next_trigger_time(#state{next_trigger_time = NTT})  -> NTT.
 state_get_running_tasks(#state{running_tasks = RunningTasks}) -> RunningTasks.
@@ -418,11 +448,11 @@ calc_current_load_test_() ->
   , ?_assertEqual(0.0, do_calc_current_load([1], 0))
   ].
 
-duration_is_not_exceeded_test_() ->
-  [ ?_assertEqual(true, duration_is_not_exceeded(infinity, 10))
-  , ?_assertEqual(true, duration_is_not_exceeded(100, 99))
-  , ?_assertEqual(false, duration_is_not_exceeded(100, 100))
-  , ?_assertEqual(false, duration_is_not_exceeded(100, 101))
+duration_is_exceeded_test_() ->
+  [ ?_assertEqual(false, duration_is_exceeded(infinity, 10))
+  , ?_assertEqual(false, duration_is_exceeded(100, 99))
+  , ?_assertEqual(true, duration_is_exceeded(100, 100))
+  , ?_assertEqual(true, duration_is_exceeded(100, 101))
   ].
 
 should_trigger_task_test_() ->
@@ -458,6 +488,7 @@ start_a_load_gen() ->
   Args = [ {name, test_duration}
          , {task, fun() -> ok end}
          , {load_spec, ponos_load_specs:make_constant(1.0)}
+         , {max_concurrent, 0}
          , {duration, 10}
          , {task_runner, ponos_default_task_runner}
          , {task_runner_args, []}
@@ -479,6 +510,39 @@ do_new_trigger_time_test_() ->
                           S = mk_state(10.0, 100, LoadSpec),
                           get_next_trigger_time(update_intensity(100, S))
                         end)
+  ].
+
+status_duration_exceeded_test() ->
+  State = #state{duration = 100, is_running = false},
+  ?assertEqual(duration_exceeded, status(100, State)).
+
+status_max_concurrency_reached_test_() ->
+  State = #state{duration = 100, is_running = false, running_tasks = 10},
+  [ ?_assertEqual( max_concurrency_reached
+                 , status(1, State#state{max_concurrent = 10}))
+  , ?_assertNotEqual( max_concurrency_reached
+                    , status(1, State#state{max_concurrent = 0}))
+  ].
+
+status_paused_test_() ->
+  State = #state{ duration = 100
+                , is_running = true
+                , max_concurrent = 0
+                , running_tasks= 10},
+  [ ?_assertNotEqual(paused, status(99, State))
+  , ?_assertEqual(paused, status(99, State#state{is_running = false}))
+  ].
+
+status_trigger_task_test_() ->
+  State = #state{ duration = infinity
+                , is_running = true
+                , max_concurrent = 0
+                , load_spec = fun(_) -> 500.0 end
+                , next_trigger_time = 10
+                , intensity = 500.0
+                },
+  [ ?_assertEqual(trigger_task, status(10, State))
+  , ?_assertEqual(skip, status(9, State))
   ].
 
 get_next_trigger_time(#state{next_trigger_time = NTT}) ->

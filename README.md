@@ -15,6 +15,14 @@ toil
 Written by Jonathan Olsson <jonathan@klarna.com> with contributions from
 Cons Åhs <cons@klarna.com>
 
+## Resources
+
+The main place to find information about ponos is the
+[github](https://github.com/klarna/ponos) page.
+
+Documentation is available as edoc as well as on the [ponos
+wiki](https://github.com/klarna/ponos/wiki).
+
 ## Quick Start Guide
 
     $> git clone https://github.com/klarna/ponos.git
@@ -80,6 +88,11 @@ Options:
 * `duration` - Defaults to `infinity`. By default the load generator
   will run until removed or paused. If set to a `pos_integer`, the load
   generator will generate load for that many milliseconds.
+* `max_concurrent` - An `integer()` used to limit how many concurrently
+  ongoing tasks the load generator may spawn. Note that this potentially
+  affects the intensity in a negative way, i.e. you may get a lower
+  output than the `load_spec` describes. By default, the load generator
+  may have an infinite amount of concurrently ongoing tasks.
 * `task_runner` - Defaults to `ponos_default_task_runner`. Must be a
   `module()` implementing the `ponos_task_runner_callbacks` behaviour.
 * `task_runner_args` - Defaults to `[]`. May be of type any(). The value
