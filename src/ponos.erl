@@ -48,10 +48,11 @@
 %%%_* Code =============================================================
 %%%_* Types ------------------------------------------------------------
 
--type load_generator_option() :: {auto_init, boolean()}  |
-                                 {duration, duration()}  |
-                                 {task_runner, module()} |
-                                 {task_runner_args, any()}.
+-type load_generator_option() :: {auto_init, boolean()}    |
+                                 {duration, duration()}    |
+                                 {task_runner, module()}   |
+                                 {task_runner_args, any()} |
+                                 {max_concurrent, non_neg_integer()}.
 -type duration()      :: non_neg_integer() | infinity.
 -type passed_time()   :: Milliseconds::integer().
 -type intensity()     :: CallsPerSecond::float().
