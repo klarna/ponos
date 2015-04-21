@@ -54,6 +54,7 @@
           is_running        :: boolean(),
           load_spec         :: ponos:load_spec(),
           max_concurrent    :: integer(),
+          limit_reported :: boolean(),
           name              :: ponos:name(),
           next_trigger_time :: number(),
           intensities       :: list(erlang:now()),
@@ -116,14 +117,17 @@ init(Args) ->
   TaskRunner    = element(2, proplists:lookup(task_runner, Args)),
   RunnerArgs    = element(2, proplists:lookup(task_runner_args, Args)),
   MaxConcurrent = element(2, proplists:lookup(max_concurrent, Args)),
+  Duration      = element(2, proplists:lookup(duration, Args)),
+  LoadSpec      = element(2, proplists:lookup(load_spec, Args)),
 
   {ok, State} = ponos_task_runner_callbacks:init(TaskRunner, Name, RunnerArgs),
   {ok, #state{
           call_counter      = 0,
-          duration          = element(2, proplists:lookup(duration, Args)),
-          load_spec         = element(2, proplists:lookup(load_spec, Args)),
+          duration          = Duration,
+          load_spec         = LoadSpec,
           is_running        = false,
           max_concurrent    = MaxConcurrent,
+          limit_reported    = false,
           name              = Name,
           next_trigger_time = 0,
           intensities       = [],
@@ -177,7 +181,7 @@ handle_info(tick, State) ->
       {stop, {shutdown, duration_exceeded}, State};
     max_concurrency_reached ->
       tick(),
-      skip(State);
+      max_concurrency(State);
     paused ->
       tick(),
       skip(State)
@@ -187,6 +191,15 @@ handle_info(_Info, State) ->
 
 skip(State) ->
   {noreply, maybe_prune_intensities(state_inc_tick_counter(State))}.
+
+max_concurrency(State) ->
+  case state_get_limit_reported(State) of
+    true ->
+      skip(State);
+    false ->
+      NewState = dispatch_concurrency_limit(State),
+      skip(NewState)
+  end.
 
 status(TimePassed, State) ->
   Duration              = state_get_duration(State),
@@ -224,6 +237,12 @@ code_change(_OldVsn, LoadGenerator, _Extra) ->
 %%%_* gen_server dispatch ----------------------------------------------
 dispatch_trigger_task(TimePassed, State) ->
   _NewState  = trigger_task_and_update_counters(TimePassed, State).
+
+dispatch_concurrency_limit(State) ->
+  {TaskRunner, RunnerState} = state_get_task_runner(State),
+  Name                      = state_get_name(State),
+  ponos_task_runner_callbacks:concurrency_limit(TaskRunner, Name, RunnerState),
+  state_set_limit_reported(State).
 
 dispatch_pause(State) ->
   {TaskRunner, S} = state_get_task_runner(State),
@@ -312,7 +331,8 @@ trigger_task_and_update_counters(TimePassed, State) ->
   NewState2 = maybe_prune_intensities(NewState1),
   NewState3 = update_intensity(TimePassed, NewState2),
   NewState4 = update_counters(NewState3),
-  update_next_trigger_time(NewState4).
+  NewState5 = update_next_trigger_time(NewState4),
+  state_clear_limit_reported(NewState5).
 
 run_task(State) ->
   spawn_link(fun() -> run_task(State, state_get_task(State)) end).
@@ -404,6 +424,7 @@ state_get_intensity(#state{intensity = Intensity})            -> Intensity.
 state_get_is_running(#state{is_running = IsRunning})          -> IsRunning.
 state_get_load_spec(#state{load_spec = LoadSpec})             -> LoadSpec.
 state_get_max_concurrent(#state{max_concurrent = MaxCon})     -> MaxCon.
+state_get_limit_reported(#state{limit_reported = Reported})   -> Reported.
 state_get_name(#state{name = Name})                           -> Name.
 state_get_next_trigger_time(#state{next_trigger_time = NTT})  -> NTT.
 state_get_running_tasks(#state{running_tasks = RunningTasks}) -> RunningTasks.
@@ -438,6 +459,12 @@ state_set_intensity(State, Intensity) when is_float(Intensity) ->
 
 state_set_is_running(State, IsRunning) when is_boolean(IsRunning) ->
   State#state{is_running = IsRunning}.
+
+state_set_limit_reported(State) ->
+  State#state{limit_reported = true}.
+
+state_clear_limit_reported(State) ->
+  State#state{limit_reported = false}.
 
 %%%_* EUnit Tests ======================================================
 -ifdef(TEST).

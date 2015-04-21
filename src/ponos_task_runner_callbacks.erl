@@ -25,6 +25,7 @@
 %%%_* Exports ==========================================================
 %% API
 -export([ call/4
+        , concurrency_limit/3
         , init/3
         , pause/3
         , start/3
@@ -33,6 +34,8 @@
 
 %%%_* Behaviour ========================================================
 -callback call(ponos:name(), ponos:task(), State::any()) -> ok.
+
+-callback concurrency_limit(ponos:name(), State::any()) -> ok.
 
 -callback init(ponos:name(), Args::any()) -> {ok, State::any()}.
 
@@ -46,6 +49,9 @@
 %%%_* External API -----------------------------------------------------
 call(CbMod, LoadGenName, Task, State) ->
   CbMod:call(LoadGenName, Task, State).
+
+concurrency_limit(CbMod, LoadGenName, State) ->
+  CbMod:concurrency_limit(LoadGenName, State).
 
 init(CbMod, LoadGenName, Args) ->
   CbMod:init(LoadGenName, Args).

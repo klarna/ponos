@@ -24,6 +24,7 @@
 -behaviour(ponos_task_runner_callbacks).
 
 -export([ call/3
+        , concurrency_limit/2
         , init/2
         , pause/2
         , start/2
@@ -33,6 +34,9 @@
 call(Name, Task, IODevice) ->
   Result = Task(),
   log_call_after(Name, Result, IODevice).
+
+concurrency_limit(Name, IODevice) ->
+  log(Name, "hit concurrency limit", IODevice).
 
 init(_Name, Path) ->
   AbsPath = filename:absname(Path),
