@@ -162,16 +162,17 @@ handle_cast(_Request, State) ->
 
 handle_info({'EXIT', _Pid, _Reason}, State) ->
   {noreply, state_dec_running_tasks(State)};
-handle_info(tick, State) ->
-  Start = state_get_start(State),
+handle_info(tick, State0) ->
+  Start = state_get_start(State0),
   TimePassed = time_passed_in_ms(os:timestamp(), Start),
+  State = update_intensity(TimePassed, State0),
   case status(TimePassed, State) of
     skip ->
       tick(),
       skip(State);
     trigger_task ->
       tick(),
-      NewState = dispatch_trigger_task(TimePassed, State),
+      NewState = dispatch_trigger_task(State),
       {noreply, NewState};
     duration_exceeded ->
       {stop, {shutdown, duration_exceeded}, State};
@@ -222,8 +223,8 @@ code_change(_OldVsn, LoadGenerator, _Extra) ->
   {ok, LoadGenerator}.
 
 %%%_* gen_server dispatch ----------------------------------------------
-dispatch_trigger_task(TimePassed, State) ->
-  _NewState  = trigger_task_and_update_counters(TimePassed, State).
+dispatch_trigger_task(State) ->
+  _NewState  = trigger_task_and_update_counters(State).
 
 dispatch_pause(State) ->
   {TaskRunner, S} = state_get_task_runner(State),
@@ -306,13 +307,12 @@ should_trigger_task(_TimePased, _TriggerTime, Intensity) when Intensity == 0 ->
 should_trigger_task(TimePassed, TriggerTime, _Intensity) ->
   TimePassed >= TriggerTime.
 
-trigger_task_and_update_counters(TimePassed, State) ->
+trigger_task_and_update_counters(State) ->
   run_task(State),
   NewState1 = state_inc_tick_counter(State),
   NewState2 = maybe_prune_intensities(NewState1),
-  NewState3 = update_intensity(TimePassed, NewState2),
-  NewState4 = update_counters(NewState3),
-  update_next_trigger_time(NewState4).
+  NewState3 = update_counters(NewState2),
+  update_next_trigger_time(NewState3).
 
 run_task(State) ->
   spawn_link(fun() -> run_task(State, state_get_task(State)) end).

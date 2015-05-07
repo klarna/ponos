@@ -6,6 +6,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Full history in change log.
 
+### Fixed
+- Address a bug causing certain load generators to be stuck on 0 load.
+
 ## [1.3.0] - 2014-11-20
 ### Added
 - Introduce a `max_concurrent` option for load generators limiting how
