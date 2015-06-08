@@ -172,7 +172,7 @@ handle_info(tick, State) ->
   case status(TimePassed, State) of
     skip ->
       tick(),
-      skip(State);
+      skip(update_intensity(TimePassed, State));
     trigger_task ->
       tick(),
       NewState = dispatch_trigger_task(TimePassed, State),
@@ -354,15 +354,23 @@ update_next_trigger_time(State) ->
   state_set_next_trigger_time(State, TriggerTime + Freq).
 
 update_intensity(TimePassed, State) ->
-  LoadSpec  = state_get_load_spec(State),
-  Intensity = LoadSpec(TimePassed),
+  OldIntensity = state_get_intensity(State),
+  LoadSpec     = state_get_load_spec(State),
+  Intensity    = LoadSpec(TimePassed),
 
   TriggerTime =
-    case intensity_changed(Intensity, state_get_intensity(State)) of
+    case intensity_changed(Intensity, OldIntensity) of
       false ->
         state_get_next_trigger_time(State);
+      true when OldIntensity == 0 ->
+        %% Special case: the old trigger time is not relevant, because
+        %% for a 0 intensity we could not calculate a trigger time, so
+        %% it still holds the last task's trigger time.
+        %%
+        %% When scheduling the next task only the current time is
+        %% relevant, not the time when the last task was executed.
+        TimePassed + freq(Intensity);
       true ->
-        OldIntensity = state_get_intensity(State),
         new_trigger_time(OldIntensity, Intensity, State)
     end,
   state_set_next_trigger_time( state_set_intensity(State, Intensity)
