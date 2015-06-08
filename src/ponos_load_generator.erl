@@ -54,7 +54,7 @@
           is_running        :: boolean(),
           load_spec         :: ponos:load_spec(),
           max_concurrent    :: integer(),
-          limit_reported :: boolean(),
+          limit_reported    :: boolean(),
           name              :: ponos:name(),
           next_trigger_time :: number(),
           intensities       :: list(erlang:now()),
