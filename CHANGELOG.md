@@ -2,9 +2,20 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased] - 2015-02-23
+## [Unreleased] - 2015-06-09
+### Added
+- Add the `max_concurrent` option to the type spec of load generator
+  options.
+- Extend the `ponos_task_runner_callbacks` behaviour with a new
+  callback for reporting hitting the maximum concurrency limit.
+
 ### Changed
 - Full history in change log.
+- Improved scheduling of tasks:
+    - A bug has beend fixed that caused a load generator never to be
+      able to raise its intensity after reporting 0 intensity.      
+    - The load generator process can catch up under high load from
+      scheduling delays.
 
 ## [1.3.0] - 2014-11-20
 ### Added

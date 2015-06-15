@@ -54,7 +54,7 @@
           is_running        :: boolean(),
           load_spec         :: ponos:load_spec(),
           max_concurrent    :: integer(),
-          limit_reported :: boolean(),
+          limit_reported    :: boolean(),
           name              :: ponos:name(),
           next_trigger_time :: number(),
           intensities       :: list(erlang:now()),
@@ -172,10 +172,10 @@ handle_info(tick, State) ->
   case status(TimePassed, State) of
     skip ->
       tick(),
-      skip(State);
+      skip(update_intensity(TimePassed, State));
     trigger_task ->
-      tick(),
-      NewState = dispatch_trigger_task(TimePassed, State),
+      tick_no_delay(),
+      NewState = dispatch_trigger_task(State),
       {noreply, NewState};
     duration_exceeded ->
       {stop, {shutdown, duration_exceeded}, State};
@@ -231,12 +231,16 @@ terminate({shutdown, removed} = Reason, State) ->
 tick() ->
   erlang:send_after(1, self(), tick).
 
+%% @private
+tick_no_delay() ->
+  self() ! tick.
+
 code_change(_OldVsn, LoadGenerator, _Extra) ->
   {ok, LoadGenerator}.
 
 %%%_* gen_server dispatch ----------------------------------------------
-dispatch_trigger_task(TimePassed, State) ->
-  _NewState  = trigger_task_and_update_counters(TimePassed, State).
+dispatch_trigger_task(State) ->
+  _NewState  = trigger_task_and_update_counters(State).
 
 dispatch_concurrency_limit(State) ->
   {TaskRunner, RunnerState} = state_get_task_runner(State),
@@ -279,7 +283,7 @@ init_load_generator(TaskRunner, TaskRunnerState, State) ->
   Start      = os:timestamp(),
   TimePassed = time_passed_in_ms(Start, Start),
   LoadSpec   = state_get_load_spec(State),
-  Intensity  = LoadSpec(TimePassed),
+  Intensity  = LoadSpec(trunc(TimePassed)),
   State#state{
     start       = Start,
     intensity   = Intensity,
@@ -325,11 +329,12 @@ should_trigger_task(_TimePased, _TriggerTime, Intensity) when Intensity == 0 ->
 should_trigger_task(TimePassed, TriggerTime, _Intensity) ->
   TimePassed >= TriggerTime.
 
-trigger_task_and_update_counters(TimePassed, State) ->
+trigger_task_and_update_counters(State) ->
   run_task(State),
   NewState1 = state_inc_tick_counter(State),
   NewState2 = maybe_prune_intensities(NewState1),
-  NewState3 = update_intensity(TimePassed, NewState2),
+  TriggerTime = state_get_next_trigger_time(NewState2),
+  NewState3 = update_intensity(TriggerTime, NewState2),
   NewState4 = update_counters(NewState3),
   NewState5 = update_next_trigger_time(NewState4),
   state_clear_limit_reported(NewState5).
@@ -354,15 +359,23 @@ update_next_trigger_time(State) ->
   state_set_next_trigger_time(State, TriggerTime + Freq).
 
 update_intensity(TimePassed, State) ->
-  LoadSpec  = state_get_load_spec(State),
-  Intensity = LoadSpec(TimePassed),
+  OldIntensity = state_get_intensity(State),
+  LoadSpec     = state_get_load_spec(State),
+  Intensity    = LoadSpec(trunc(TimePassed)),
 
   TriggerTime =
-    case intensity_changed(Intensity, state_get_intensity(State)) of
+    case intensity_changed(Intensity, OldIntensity) of
       false ->
         state_get_next_trigger_time(State);
+      true when OldIntensity == 0 ->
+        %% Special case: the old trigger time is not relevant, because
+        %% for a 0 intensity we could not calculate a trigger time, so
+        %% it still holds the last task's trigger time.
+        %%
+        %% When scheduling the next task only the current time is
+        %% relevant, not the time when the last task was executed.
+        TimePassed + freq(Intensity);
       true ->
-        OldIntensity = state_get_intensity(State),
         new_trigger_time(OldIntensity, Intensity, State)
     end,
   state_set_next_trigger_time( state_set_intensity(State, Intensity)
@@ -407,11 +420,11 @@ calc_top_modeled_load(State) ->
     undefined ->
       0.0;
     Start ->
-      LoadSpec(time_passed_in_ms(os:timestamp(), Start))
+      LoadSpec(trunc(time_passed_in_ms(os:timestamp(), Start)))
   end.
 
 time_passed_in_ms(Now, Then) ->
-  round(timer:now_diff(Now, Then) / 1000).
+  timer:now_diff(Now, Then) / 1000.
 
 intensity_ms(Seconds) ->
   Seconds / 1000.

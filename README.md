@@ -111,17 +111,41 @@ expressed as calls per second. The user may implement its own load
 specifications.
 
 
-### A Note About Sampling Intervals
+### A Note About Sampling Intervals and Timers
 
 A load generator is implemented as a gen_server receiving a tick every
 millisecond. The `LoadSpec` - which is a function of time - thus gets
 sampled at every tick to determine whether load should be sent or
-not. Since we are theoretically limited to measure half of the sample
-rate we are limited to output 500.0 calls per second per load
-generator. Should the user need more than 500 cps for a specific task,
-two - or more - generators are required. Note that this number may vary
-depending on your CPU and/or OS and ponos is not guaranteed to output
-500 cps for a single load generator.
+not. At each tick the load generator may decide to generate multiple
+calls, so it is - at least in theory - possible to produce arbitrary
+large amount of cps.
+
+In practice however the load generator itself will become CPU limited
+above a point that depends on your CPU and/or OS. It is better to use
+two - or more - generators to leverage the power of multi-core CPUs if
+such high load is required.
+
+There are other factors that may prevent a load generator to exactly
+reproduce the specified load pattern.
+
+One of the factors is how timers are implemented in the Erlang VM: a
+timer may never fire early, but may get delayed indefinitely. This
+means when the load generator decides to sleep for 1 ms, it will
+usually end up sleeping for somewhat longer. This will reduce the
+actual sampling frequency of the `LoadSpec`. Even if the system is not
+otherwise overloaded you may not assume sampling frequencies above 500
+Hz in practice.
+
+The other limiting factor is that the load generator will favor higher
+intensities over lower ones when the `LoadSpec` is not constant. This
+effect is best explained via an example.
+
+Consider a `LoadSpec` that for even seconds specifies intensity 0.5
+and for odd seconds 4.0. This means ponos will try to trigger tasks at
+1000, 1250, 1500, 1750, and 3000 milliseconds. The actual intensity
+will be therefore 4.0 for odd seconds, but for even seconds it will
+only fall to 0.8, not to 0.5. The low intensity interval is simply too
+short.
 
 ## Task Runners
 
