@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased] 2015-11-01
+### Added
+- Add accessors for `max_concurrent` option which allows for dynamic
+  configuration.
+
 ## [1.4.0] - 2015-09-07
 ### Added
 - Add the `max_concurrent` option to the type spec of load generator
@@ -12,7 +17,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Full history in change log.
 - Improved scheduling of tasks:
-    - A bug has beend fixed that caused a load generator never to be
+    - A bug has been fixed that caused a load generator never to be
       able to raise its intensity after reporting 0 intensity.      
     - The load generator process can catch up under high load from
       scheduling delays.

@@ -29,11 +29,13 @@
 -export([ add_load_generator/1
         , get_duration/1
         , get_load_generators/0
+        , get_max_concurrent/1
         , get_start/1
         , init_load/1
         , is_running/1
         , pause/1
         , remove_load_generator/1
+        , set_max_concurrent/2
         , start_link/0
         , top/0
         ]).
@@ -95,6 +97,9 @@ get_duration(Name) ->
 get_load_generators() ->
   call(get_load_generators).
 
+get_max_concurrent(Name) ->
+  call({get_max_concurrent, Name}).
+
 get_start(Name) ->
   call({get_start, Name}).
 
@@ -113,6 +118,9 @@ pause(Name) ->
 
 remove_load_generator(Name) ->
   call({remove_load_generator, Name}).
+
+set_max_concurrent(Name, MaxConcurrent) ->
+  call({set_max_concurrent, Name, MaxConcurrent}).
 
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
@@ -135,6 +143,8 @@ handle_call({get_duration, Name}, _From, State) ->
   server_get_duration(Name, State);
 handle_call(get_load_generators, _From, State) ->
   server_get_load_generators(State);
+handle_call({get_max_concurrent, Name}, _From, State) ->
+  server_get_max_concurrent(Name, State);
 handle_call({get_start, Name}, _From, State) ->
   server_get_start(Name, State);
 handle_call({init_load, Name}, _From, State) ->
@@ -145,6 +155,8 @@ handle_call({pause, Name}, _From, State) ->
   server_pause(Name, State);
 handle_call({remove_load_generator, Name}, _From, State) ->
   server_remove_load_generator(Name, State);
+handle_call({set_max_concurrent, Name, MaxConcurrent}, _From, State) ->
+  server_set_max_concurrent(Name, MaxConcurrent, State);
 handle_call(top, _From, State) ->
   server_top(State).
 
@@ -209,12 +221,18 @@ collect_top_and_name_for(Name, {LoadGenPid, _Ref}, Acc) ->
   LoadGenerator = [{name, Name}|ponos_load_generator:top(LoadGenPid)],
   [LoadGenerator|Acc].
 
+server_get_max_concurrent(Name, State) ->
+  Fun = fun(LoadGen) ->
+            {reply, ponos_load_generator:get_max_concurrent(LoadGen), State}
+        end,
+  execute_on_existing(Name, Fun, State).
+
 server_get_start(Name, State) ->
   LoadGen = fetch_load_generator(Name, State),
   {reply, ponos_load_generator:get_start(LoadGen), State}.
 
 server_init_load(Name, State) ->
-  Fun = fun() -> maybe_start_load_generator(Name, State) end,
+  Fun = fun(_) -> maybe_start_load_generator(Name, State) end,
   execute_on_existing(Name, Fun, State).
 
 maybe_start_load_generator(Name, State) ->
@@ -231,15 +249,13 @@ start_load_generator(LoadGen) ->
   _NewLoadGen = ponos_load_generator:start(LoadGen).
 
 server_is_running(Name, State) ->
-  Fun = fun() ->
-            LoadGen = fetch_load_generator(Name, State),
+  Fun = fun(LoadGen) ->
             {reply, ponos_load_generator:is_running(LoadGen), State}
         end,
   execute_on_existing(Name, Fun, State).
 
 server_pause(Name, State) ->
-  Fun = fun() ->
-            LoadGen = fetch_load_generator(Name, State),
+  Fun = fun(LoadGen) ->
             case ponos_load_generator:is_running(LoadGen) of
               true  -> {reply, ponos_load_generator:pause(LoadGen), State};
               false -> {reply, ok, State}
@@ -248,14 +264,22 @@ server_pause(Name, State) ->
   execute_on_existing(Name, Fun, State).
 
 server_remove_load_generator(Name, State) ->
-  Fun = fun() ->
-            ok = shutdown_load_generator(fetch_load_generator(Name, State)),
+  Fun = fun(LoadGen) ->
+            ok = shutdown_load_generator(LoadGen),
             {reply, ok, State}
         end,
   execute_on_existing(Name, Fun, State).
 
 shutdown_load_generator(LoadGen) ->
   ponos_load_generator:stop(LoadGen).
+
+server_set_max_concurrent(Name, MaxConcurrent, State) ->
+  Fun = fun(LoadGen) ->
+            R = ponos_load_generator:set_max_concurrent(LoadGen, MaxConcurrent),
+            {reply, R, State}
+        end,
+  execute_on_existing(Name, Fun, State).
+
 
 server_top(State) ->
   AllTop = top_for_all_running_load_gens(State),
@@ -305,10 +329,9 @@ update_modeled_load(LoadGen, TopStats, State, Acc) ->
       Acc
   end.
 
-
 execute_on_existing(Name, Fun, State) ->
   case load_generator_exists(Name, State) of
-    true  -> Fun();
+    true  -> Fun(fetch_load_generator(Name, State));
     false -> mk_non_existing_profile_reply(Name, State)
   end.
 

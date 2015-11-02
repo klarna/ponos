@@ -166,10 +166,11 @@ The `ponos_task_runner_callbacks` behaviour defines the following interface:
 | ponos_task_runner_callbacks behaviour        |
 | -------------------------------------------- |
 | `call(Name, Task, State) -> ok`              |
+| `concurrency_limit(Name, State::any()) -> ok`|
 | `init(Name, Args) -> {ok, State::any()}`     |
 | `pause(Name, State) -> ok`                   |
 | `start(Name, State) -> {ok, NewState::any()` |
-| `teminate(Name, State) -> ok`                |
+| `terminate(Name, State) -> ok`               |
 
 The API allows for modifying the state of the task runner at two
 occasions: `init` and `start`. In all other instances, the task runner

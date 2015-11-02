@@ -263,6 +263,72 @@ top_multiple_load_gens_test_() ->
        ]
    end}.
 
+dynamically_set_and_get_max_concurrent_test_() ->
+  {setup,
+   fun() -> setup([name1], [{max_concurrent, 0}]) end,
+   fun teardown_test_case/1,
+   fun(_) ->
+       [ ?_assertEqual(0, ponos:get_max_concurrent(name1))
+       , ?_assertEqual(ok, ponos:set_max_concurrent(name1, 1))
+       , ?_assertEqual(1, ponos:get_max_concurrent(name1))
+       ]
+   end}.
+
+%% TODO: Perhaps a CT test?
+dynamically_set_max_concurrent_test() ->
+  ok = application:start(ponos),
+  Name = setup_dynamic_max_concurrent(),
+
+  ?assertEqual(1, run_dynamic_test(1)),
+  ponos:set_max_concurrent(Name, 2),
+  ?assertEqual(2, run_dynamic_test(2)),
+  ponos:set_max_concurrent(Name, 10),
+  ?assertEqual(10, run_dynamic_test(10)),
+
+  %% teardown
+  ok = application:stop(ponos).
+
+setup_dynamic_max_concurrent() ->
+  Name     = max_concurrency_test,
+  LoadSpec = ponos_load_specs:make_constant(500.0),
+  Options  = [{max_concurrent, 1}],
+  Pid      = self(),
+  Task     = fun() ->
+                 Pid ! {new_trigger, self()},
+                 receive
+                   ok -> ok
+                 end
+             end,
+  LoadGen  = [ {name, Name}
+             , {load_spec, LoadSpec}
+             , {task, Task}
+             , {options, Options}],
+
+  ponos:add_load_generators(LoadGen),
+  ponos:init_load_generators(),
+  Name.
+
+run_dynamic_test(MaxConcurrent) ->
+  PidsReceivedFrom = receive_expected_msgs(MaxConcurrent),
+  [P ! ok || P <- PidsReceivedFrom],
+  length(PidsReceivedFrom).
+
+receive_expected_msgs(MaxConcurrent) ->
+  receive_expected_msgs(MaxConcurrent, []).
+
+receive_expected_msgs(MaxConcurrent, Acc) when length(Acc) =:= MaxConcurrent ->
+  {messages, Messages} = process_info(self(), messages),
+  case [Msg || {Msg, _} <- Messages, Msg =:= new_trigger] of
+    [] ->
+      Acc;
+    TooManyMessages ->
+      throw({too_many_messages, length(TooManyMessages), Messages})
+  end;
+receive_expected_msgs(MaxConcurrent, Acc) ->
+  receive
+    {new_trigger, Pid} ->
+      receive_expected_msgs(MaxConcurrent, [Pid|Acc])
+  end.
 
 %%%_* Test Helpers ============================================================
 add_basic_load_generator(Name, Options) ->
