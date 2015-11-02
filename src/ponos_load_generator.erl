@@ -30,11 +30,13 @@
 %% API
 -export([ get_duration/1
         , get_load_spec/1
+        , get_max_concurrent/1
         , get_name/1
         , get_start/1
         , get_task/1
         , is_running/1
         , pause/1
+        , set_max_concurrent/2
         , start/1
         , start_link/1
         , stop/1
@@ -45,7 +47,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
 
-%% TODO: Should we terminate with a timer?
 %% TODO: Some unit tests are missing
 %%%_* Records and Definitions ==========================================
 -record(state, {
@@ -82,6 +83,9 @@ get_duration(LoadGenerator) ->
 get_load_spec(LoadGenerator) ->
   gen_server:call(LoadGenerator, get_load_spec).
 
+get_max_concurrent(LoadGenerator) ->
+  gen_server:call(LoadGenerator, get_max_concurrent).
+
 get_name(LoadGenerator) ->
   gen_server:call(LoadGenerator, get_name).
 
@@ -96,6 +100,9 @@ is_running(LoadGenerator) ->
 
 pause(LoadGenerator) ->
   gen_server:call(LoadGenerator, pause).
+
+set_max_concurrent(LoadGenerator, MaxConcurrent) ->
+  gen_server:call(LoadGenerator, {set_max_concurrent, MaxConcurrent}).
 
 start(LoadGenerator) ->
   ok = gen_server:call(LoadGenerator, start),
@@ -142,6 +149,8 @@ handle_call(get_duration, _From, State) ->
   {reply, state_get_duration(State), State};
 handle_call(get_load_spec, _From, State) ->
   {reply, state_get_load_spec(State), State};
+handle_call(get_max_concurrent, _From, State) ->
+  {reply, state_get_max_concurrent(State), State};
 handle_call(get_name, _From, State) ->
   {reply, state_get_name(State), State};
 handle_call(get_start, _From, State) ->
@@ -152,6 +161,8 @@ handle_call(is_running, _From, State) ->
   {reply, state_get_is_running(State), State};
 handle_call(pause, _From, State) ->
   {reply, ok, dispatch_pause(State)};
+handle_call({set_max_concurrent, MaxConcurrent}, _From, State) ->
+  {reply, ok, state_set_max_concurrent(State, MaxConcurrent)};
 handle_call(stop, _From, State) ->
   {stop, {shutdown, removed}, ok, State};
 handle_call(start, _From, State) ->
@@ -475,6 +486,9 @@ state_set_is_running(State, IsRunning) when is_boolean(IsRunning) ->
 
 state_set_limit_reported(State) ->
   State#state{limit_reported = true}.
+
+state_set_max_concurrent(State, MaxConcurrent) ->
+  State#state{max_concurrent = MaxConcurrent}.
 
 state_clear_limit_reported(State) ->
   State#state{limit_reported = false}.

@@ -26,6 +26,7 @@
 %% API
 -export([ add_load_generators/1
         , get_load_generators/0
+        , get_max_concurrent/1
         , init_load_generators/0
         , init_load_generators/1
         , is_running/1
@@ -33,6 +34,7 @@
         , pause_load_generators/1
         , remove_load_generators/0
         , remove_load_generators/1
+        , set_max_concurrent/2
         , start/0
         , top/0
         ]).
@@ -87,6 +89,13 @@ add_load_generator(Arg) ->
 %% @end
 get_load_generators() ->
   ponos_serv:get_load_generators().
+
+-spec get_max_concurrent(name()) -> non_neg_integer().
+%% @doc Return the `max_concurrent' option of the load generator `Name'.
+%%
+%% `0' is equal to unlimited number of ongoing tasks.
+get_max_concurrent(Name) ->
+  ponos_serv:get_max_concurrent(Name).
 
 -spec init_load_generators() -> [ok | {error, {non_existing, name()}}].
 %% @doc Same as {@link init_load_generators/1}, but for all registered
@@ -157,6 +166,15 @@ remove_load_generators(Names) when is_list(Names) ->
   [remove_load_generator(Name) || Name <- Names];
 remove_load_generators(Name) when is_atom(Name) ->
   remove_load_generators([Name]).
+
+-spec set_max_concurrent(name(), non_neg_integer()) -> ok.
+%% @doc Set the maximum number of ongoing tasks a load generator may
+%% spawn.
+%%
+%% This can be done as a protective measure (i.e. to not be overrun by
+%% processes), or as a means to simulate a fixed number of workers.
+set_max_concurrent(Name, MaxConcurrent) ->
+  ok = ponos_serv:set_max_concurrent(Name, MaxConcurrent).
 
 -spec remove_load_generator(name()) -> ok | {error, {non_existing, name()}}.
 %% @private
