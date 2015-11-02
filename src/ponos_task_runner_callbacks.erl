@@ -47,21 +47,44 @@
 
 %%%_* Code =============================================================
 %%%_* External API -----------------------------------------------------
+
+%% @doc Executed by the load generator when a task should be triggered,
+%% according to the load generator's `load_spec'.
 call(CbMod, LoadGenName, Task, State) ->
   CbMod:call(LoadGenName, Task, State).
 
+%% @doc Executed by the load generator when a task was prevented from
+%% being triggered by the `max_concurrent' option.
+%%
+%% This only applies to load generators where the `max_concurrent'
+%% option has been set to anything other than the default value of `0'.
+%%
+%% This will only execute once every time the concurrency limit is
+%% reached.
 concurrency_limit(CbMod, LoadGenName, State) ->
   CbMod:concurrency_limit(LoadGenName, State).
 
+%% @doc Executed by the load generator during the init phase (i.e. in
+%% the gen_server callback).
+%%
+%% The return value is used as `State' for the task runner.
 init(CbMod, LoadGenName, Args) ->
   CbMod:init(LoadGenName, Args).
 
+%% @doc Executed by the load generator when beeing paused.
 pause(CbMod, LoadGenName, State) ->
   CbMod:pause(LoadGenName, State).
 
+%% @doc Executed by the load generator when starting (through
+%% `ponos:init_load_generators()' or by setting the option `{auto_init,
+%% true}').
+%%
+%% Apart from {@link init/3}, this is the only function where altering
+%% the state of the task runner is allowed.
 start(CbMod, LoadGenName, State) ->
   CbMod:start(LoadGenName, State).
 
+%% @doc Executed by the load generator when terminating.
 terminate(CbMod, LoadGenName, State) ->
   CbMod:terminate(LoadGenName, State).
 
