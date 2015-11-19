@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] 2015-11-21
+### Added
+- Introduce new functions `ponos:add_load_generator/{3,4}` for adding a
+  single load generator with the required arguments as part of the
+  function signature.
+
 ### Changed
 - Use erlang.mk in favour of rebar.
 
