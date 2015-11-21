@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased] 2015-11-21
+### Changed
+- Use erlang.mk in favour of rebar.
+
 ## [1.5.0] 2015-11-02
 ### Added
 - Add accessors for `max_concurrent` option which allows for dynamic
