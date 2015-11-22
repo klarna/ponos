@@ -24,7 +24,9 @@
 
 %%%_* Exports ==========================================================
 %% API
--export([ add_load_generators/1
+-export([ add_load_generator/3
+        , add_load_generator/4
+        , add_load_generators/1
         , get_load_generators/0
         , get_max_concurrent/1
         , init_load_generators/0
@@ -50,11 +52,11 @@
 %%%_* Code =============================================================
 %%%_* Types ------------------------------------------------------------
 
--type load_generator_option() :: {auto_init, boolean()}    |
-                                 {duration, duration()}    |
-                                 {task_runner, module()}   |
-                                 {task_runner_args, any()} |
-                                 {max_concurrent, non_neg_integer()}.
+-type opt()           :: {auto_init, boolean()}    |
+                         {duration, duration()}    |
+                         {task_runner, module()}   |
+                         {task_runner_args, any()} |
+                         {max_concurrent, non_neg_integer()}.
 -type duration()      :: non_neg_integer() | infinity.
 -type passed_time()   :: Milliseconds::integer().
 -type intensity()     :: CallsPerSecond::float().
@@ -64,11 +66,26 @@
 -type arg()           :: {name,      name()}                     |
                          {task,      task()}                     |
                          {load_spec, load_spec()}                |
-                         {options,   [load_generator_option()]}.
--type args() :: [arg()].
+                         {options,   [opt()]}.
+-type args()          :: [arg()].
 
 
 %%%_* External API -----------------------------------------------------
+-spec add_load_generator( name()
+                        , task()
+                        , load_spec()
+                        ) -> ok | {error, {duplicated, name()}}.
+add_load_generator(Name, Task, LoadSpec) ->
+  add_load_generator(Name, Task, LoadSpec, []).
+
+-spec add_load_generator( name()
+                        , task()
+                        , load_spec()
+                        , [opt()]
+                        ) -> ok | {error, {duplicated, name()}}.
+add_load_generator(Name, Task, LoadSpec, Options) ->
+  ponos_serv:add_load_generator(Name, Task, LoadSpec, Options).
+
 -spec add_load_generators([args()]) -> [ok | {error, {duplicated, name()}}].
 %% @doc Add load generators to ponos. If a load generator with the same
 %% name is added twice, the original one *won't* be overwritten.
@@ -81,7 +98,11 @@ add_load_generators([H|_] = Args) when is_tuple(H) ->
 -spec add_load_generator(args()) -> ok | {error, {duplicated, name()}}.
 %% @private
 add_load_generator(Arg) ->
-  ponos_serv:add_load_generator(Arg).
+  {name, Name}          = lists:keyfind(name, 1, Arg),
+  {task, Task}          = lists:keyfind(task, 1, Arg),
+  {load_spec, LoadSpec} = lists:keyfind(load_spec, 1, Arg),
+  Options               = proplists:get_value(options, Arg, []),
+  ponos_serv:add_load_generator(Name, Task, LoadSpec, Options).
 
 -spec get_load_generators() -> list().
 %% @doc Return a readable representation of all registered load

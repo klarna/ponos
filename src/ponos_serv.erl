@@ -26,7 +26,7 @@
 
 %%%_* Exports ==========================================================
 %% API
--export([ add_load_generator/1
+-export([ add_load_generator/4
         , get_duration/1
         , get_load_generators/0
         , get_max_concurrent/1
@@ -54,14 +54,6 @@
 
 %%%_* Code =============================================================
 %%%_* External API -----------------------------------------------------
--spec add_load_generator(ponos:args()) -> ok | {error, {duplicated, _}}.
-add_load_generator(Args) ->
-  add_load_generator(element(2, proplists:lookup(name, Args)),
-                     element(2, proplists:lookup(task, Args)),
-                     element(2, proplists:lookup(load_spec, Args)),
-                     proplists:get_value(options, Args, [])).
-
-%% @private
 add_load_generator(Name, Task, LoadSpec, Options) when is_atom(Name),
                                                        is_function(Task),
                                                        is_function(LoadSpec),
