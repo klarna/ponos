@@ -41,7 +41,7 @@
 
 -callback pause(ponos:name(), State::any()) -> ok.
 
--callback start(ponos:name(), State::any()) -> {ok, NewState::any}.
+-callback start(ponos:name(), State::any()) -> {ok, NewState::any()}.
 
 -callback terminate(ponos:name(), State::any()) -> ok.
 
