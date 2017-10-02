@@ -506,7 +506,7 @@ state_clear_limit_reported(State) ->
 
 calc_current_load_test_() ->
   [ ?_assertEqual(0.0, calc_current_load([]))
-  , ?_assertEqual(0.2, do_calc_current_load([1, 2], 10000))
+  , ?_assertEqual(0.1, do_calc_current_load([1, 2], 10000))
   , ?_assertEqual(0.0, do_calc_current_load([1], 0))
   ].
 
