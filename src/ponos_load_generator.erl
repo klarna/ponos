@@ -71,6 +71,7 @@
              ]).
 
 -define(PRUNE_INTENSITY_INTERVAL, 2000).
+-define(PRUNE_INTENSITY_MIN_LENGTH, 2).
 
 %%%_* Code =============================================================
 %%%_* Types ------------------------------------------------------------
@@ -312,11 +313,17 @@ maybe_prune_intensities(State) ->
 
 do_prune_intensities(State) ->
   Intensities = state_get_intensities(State),
-  Now = os:timestamp(),
-  Fun = fun(E) ->
-            time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
-        end,
-  NewIntensities = lists:takewhile(Fun, Intensities),
+  NewIntensities = 
+    case length(Intensities) =< ?PRUNE_INTENSITY_MIN_LENGTH of
+      true ->
+        Intensities;
+      false ->
+        Now = os:timestamp(),
+        Fun = fun(E) ->
+                  time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
+              end,
+        lists:takewhile(Fun, Intensities)
+    end,
   state_set_intensities(State, NewIntensities).
 
 duration_is_exceeded(Duration, TimePassed) ->
@@ -416,13 +423,14 @@ freq(Intensity) ->
   1 / intensity_ms(Intensity).
 
 calc_current_load([]) -> 0.0;
+calc_current_load([_]) -> 0.0;
 calc_current_load(Intensities) ->
-  Period = time_passed_in_ms(os:timestamp(), lists:last(Intensities)),
+  Period = time_passed_in_ms(hd(Intensities), lists:last(Intensities)),
   do_calc_current_load(Intensities, Period).
 
 do_calc_current_load(_Intensities, 0)     -> 0.0;
 do_calc_current_load(Intensities, Period) ->
-  _CurrentLoad = length(Intensities) / Period * 1000.0.
+  _CurrentLoad = (length(Intensities) - 1) / Period * 1000.0.
 
 calc_top_modeled_load(State) ->
   Start = state_get_start(State),
