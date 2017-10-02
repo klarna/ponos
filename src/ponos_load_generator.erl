@@ -322,9 +322,19 @@ do_prune_intensities(State) ->
         Fun = fun(E) ->
                   time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
               end,
-        lists:takewhile(Fun, Intensities)
+        takewhile(Fun, Intensities, ?PRUNE_INTENSITY_MIN_LENGTH, [])
     end,
   state_set_intensities(State, NewIntensities).
+
+takewhile(_, [], _, NewList) ->
+  lists:reverse(NewList);
+takewhile(Fun, [H|T], MinEntries, NewList) ->
+  case Fun(H) of
+    true when length(T) + length(NewList) >= MinEntries ->
+      takewhile(Fun, T, MinEntries, NewList);
+    _ ->
+      takewhile(Fun, T, MinEntries, [H|NewList])
+  end.
 
 duration_is_exceeded(Duration, TimePassed) ->
   (Duration =/= infinity) andalso (TimePassed >= Duration).
@@ -509,6 +519,15 @@ calc_current_load_test_() ->
   , ?_assertEqual(0.1, do_calc_current_load([1, 2], 10000))
   , ?_assertEqual(0.0, do_calc_current_load([1], 0))
   ].
+
+takewhile_min_entries_test_() ->
+  Fun = fun(E) ->
+            E < 10
+        end,
+  [ ?_assertEqual([11,20], takewhile(Fun, [1, 2, 11, 20], 2, []))
+  , ?_assertEqual([5,14], takewhile(Fun, [3,5,14], 2, []))
+  , ?_assertEqual([13,16,19], takewhile(Fun, [1,5,13,16,19], 2, []))
+  , ?_assertEqual([12,14,16], takewhile(Fun, [12,14,16], 2, []))].
 
 duration_is_exceeded_test_() ->
   [ ?_assertEqual(false, duration_is_exceeded(infinity, 10))
