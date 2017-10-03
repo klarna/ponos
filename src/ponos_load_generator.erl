@@ -71,7 +71,6 @@
              ]).
 
 -define(PRUNE_INTENSITY_INTERVAL, 2000).
--define(PRUNE_INTENSITY_MIN_LENGTH, 2).
 
 %%%_* Code =============================================================
 %%%_* Types ------------------------------------------------------------
@@ -281,9 +280,8 @@ dispatch_terminate(_Reason, State) ->
   ok.
 
 dispatch_top(State) ->
-  Intensities = state_get_intensities(State),
   ModeledLoad = calc_top_modeled_load(State),
-  CurrentLoad = calc_current_load(Intensities),
+  CurrentLoad = calc_current_load(State),
   [ {current_load, CurrentLoad}
   , {total_count,  state_get_call_counter(State)}
   , {modeled_load, ModeledLoad}
@@ -312,28 +310,18 @@ maybe_prune_intensities(State) ->
   end.
 
 do_prune_intensities(State) ->
-  Intensities = state_get_intensities(State),
-  NewIntensities = 
-    case length(Intensities) =< ?PRUNE_INTENSITY_MIN_LENGTH of
-      true ->
-        Intensities;
-      false ->
-        Now = os:timestamp(),
-        Fun = fun(E) ->
-                  time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
-              end,
-        takewhile(Fun, Intensities, ?PRUNE_INTENSITY_MIN_LENGTH, [])
-    end,
-  state_set_intensities(State, NewIntensities).
-
-takewhile(_, [], _, NewList) ->
-  lists:reverse(NewList);
-takewhile(Fun, [H|T], MinEntries, NewList) ->
-  case Fun(H) of
-    true when length(T) + length(NewList) >= MinEntries ->
-      takewhile(Fun, T, MinEntries, NewList);
-    _ ->
-      takewhile(Fun, T, MinEntries, [H|NewList])
+  %% Never prune the latest two entries!
+  case state_get_intensities(State) of
+    [I1, I2 | _] ->
+      Now = os:timestamp(),
+      Fun = fun(E) ->
+                time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
+            end,
+      NewIntensities = [I1, I2 
+                        | lists:takewhile(Fun, state_get_intensities(State))],
+      state_set_intensities(State, NewIntensities);
+    _LessThanTwoElements ->
+      State
   end.
 
 duration_is_exceeded(Duration, TimePassed) ->
@@ -432,15 +420,17 @@ freq(Intensity) when Intensity == 0 ->
 freq(Intensity) ->
   1 / intensity_ms(Intensity).
 
-calc_current_load([]) -> 0.0;
-calc_current_load([_]) -> 0.0;
-calc_current_load(Intensities) ->
+calc_current_load(#state{intensities=[]}) -> 0.0;
+calc_current_load(#state{intensities=[_]}) -> 0.0;
+calc_current_load(State) ->
+  Intensities = state_get_intensities(State),
   Period = time_passed_in_ms(hd(Intensities), lists:last(Intensities)),
-  do_calc_current_load(Intensities, Period).
+  do_calc_current_load(State, Period).
 
-do_calc_current_load(_Intensities, 0)     -> 0.0;
-do_calc_current_load(Intensities, Period) ->
-  _CurrentLoad = (length(Intensities) - 1) / Period * 1000.0.
+do_calc_current_load(_State, 0)     -> 0.0;
+do_calc_current_load(State, Period) ->
+  Intensities = state_get_intensities(State),
+  _CurrentLoad = min(state_get_intensity(State),(length(Intensities) - 1) / Period * 1000.0).
 
 calc_top_modeled_load(State) ->
   Start = state_get_start(State),
@@ -515,19 +505,10 @@ state_clear_limit_reported(State) ->
 -ifdef(TEST).
 
 calc_current_load_test_() ->
-  [ ?_assertEqual(0.0, calc_current_load([]))
-  , ?_assertEqual(0.1, do_calc_current_load([1, 2], 10000))
-  , ?_assertEqual(0.0, do_calc_current_load([1], 0))
+  [ ?_assertEqual(0.0, calc_current_load(#state{intensities=[]}))
+  , ?_assertEqual(0.1, do_calc_current_load(#state{intensities=[1,2]}, 10000))
+  , ?_assertEqual(0.0, do_calc_current_load(#state{intensities=[1]}, 0))
   ].
-
-takewhile_min_entries_test_() ->
-  Fun = fun(E) ->
-            E < 10
-        end,
-  [ ?_assertEqual([11,20], takewhile(Fun, [1, 2, 11, 20], 2, []))
-  , ?_assertEqual([5,14], takewhile(Fun, [3,5,14], 2, []))
-  , ?_assertEqual([13,16,19], takewhile(Fun, [1,5,13,16,19], 2, []))
-  , ?_assertEqual([12,14,16], takewhile(Fun, [12,14,16], 2, []))].
 
 duration_is_exceeded_test_() ->
   [ ?_assertEqual(false, duration_is_exceeded(infinity, 10))
