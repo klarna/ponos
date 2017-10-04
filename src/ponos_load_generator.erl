@@ -312,13 +312,13 @@ maybe_prune_intensities(State) ->
 do_prune_intensities(State) ->
   %% Never prune the latest two entries!
   case state_get_intensities(State) of
-    [I1, I2 | _] ->
+    [I1, I2 | T] ->
       Now = os:timestamp(),
       Fun = fun(E) ->
                 time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
             end,
       NewIntensities = [I1, I2 
-                        | lists:takewhile(Fun, state_get_intensities(State))],
+                        | lists:takewhile(Fun, T)],
       state_set_intensities(State, NewIntensities);
     _LessThanTwoElements ->
       State
@@ -420,12 +420,15 @@ freq(Intensity) when Intensity == 0 ->
 freq(Intensity) ->
   1 / intensity_ms(Intensity).
 
-calc_current_load(#state{intensities=[]}) -> 0.0;
-calc_current_load(#state{intensities=[_]}) -> 0.0;
 calc_current_load(State) ->
-  Intensities = state_get_intensities(State),
-  Period = time_passed_in_ms(hd(Intensities), lists:last(Intensities)),
-  do_calc_current_load(State, Period).
+  case state_get_intensities(State) of
+    [_, _ | _] ->
+      Intensities = state_get_intensities(State),
+      Period = time_passed_in_ms(hd(Intensities), lists:last(Intensities)),
+      do_calc_current_load(State, Period);
+    _Other ->
+      0.0
+  end.
 
 do_calc_current_load(_State, 0)     -> 0.0;
 do_calc_current_load(State, Period) ->
