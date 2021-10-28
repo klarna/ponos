@@ -8,9 +8,6 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   single load generator with the required arguments as part of the
   function signature.
 
-### Changed
-- Use erlang.mk in favour of rebar.
-
 ## [1.5.0] 2015-11-02
 ### Added
 - Add accessors for `max_concurrent` option which allows for dynamic
@@ -27,7 +24,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - Full history in change log.
 - Improved scheduling of tasks:
     - A bug has been fixed that caused a load generator never to be
-      able to raise its intensity after reporting 0 intensity.      
+      able to raise its intensity after reporting 0 intensity.
     - The load generator process can catch up under high load from
       scheduling delays.
 
