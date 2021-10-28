@@ -8,6 +8,15 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   single load generator with the required arguments as part of the
   function signature.
 
+## [1.5.2] 2017-10-10
+### Changed
+- Fix stats for low CPS generators.
+
+
+## [1.5.1] 2017-03-23
+### Changed
+- Fixed type specs for `start/2` callback.
+
 ## [1.5.0] 2015-11-02
 ### Added
 - Add accessors for `max_concurrent` option which allows for dynamic
