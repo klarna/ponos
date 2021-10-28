@@ -3,7 +3,7 @@ REBAR ?= $(shell which rebar 2> /dev/null || which ./rebar)
 
 DEPS_DIR = $(CURDIR)/deps
 
-DIALYZER_OPTIONS := --fullpath --no_native  -Wunderspecs
+DIALYZER_OPTIONS := --fullpath --no_native -DDIALYZER_RUN -Wunderspecs
 
 ERLANG_DIALYZER_APPS := compiler \
                         crypto   \

@@ -8,6 +8,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   single load generator with the required arguments as part of the
   function signature.
 
+### Changed
+- Fixed Dialyzer errors.
+
 ## [1.5.2] 2017-10-10
 ### Changed
 - Fix stats for low CPS generators.
