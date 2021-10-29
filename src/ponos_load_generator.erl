@@ -58,11 +58,11 @@
           limit_reported    :: boolean(),
           name              :: ponos:name(),
           next_trigger_time :: number(),
-          intensities       :: list(erlang:now()),
-          intensity         :: ponos:intensity(),
+          intensities       :: list(erlang:timestamp()),
+          intensity         :: ponos:intensity() | undefined,
           running_tasks     :: integer(),
           start             :: erlang:timestamp(),
-          task_runner       :: module(),
+          task_runner       :: {module(), any()},
           task              :: ponos:task(),
           tick_counter      :: integer()
          }).
@@ -280,9 +280,8 @@ dispatch_terminate(_Reason, State) ->
   ok.
 
 dispatch_top(State) ->
-  Intensities = state_get_intensities(State),
   ModeledLoad = calc_top_modeled_load(State),
-  CurrentLoad = calc_current_load(Intensities),
+  CurrentLoad = calc_current_load(State),
   [ {current_load, CurrentLoad}
   , {total_count,  state_get_call_counter(State)}
   , {modeled_load, ModeledLoad}
@@ -311,13 +310,19 @@ maybe_prune_intensities(State) ->
   end.
 
 do_prune_intensities(State) ->
-  Intensities = state_get_intensities(State),
-  Now = os:timestamp(),
-  Fun = fun(E) ->
-            time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
-        end,
-  NewIntensities = lists:takewhile(Fun, Intensities),
-  state_set_intensities(State, NewIntensities).
+  %% Never prune the latest two entries!
+  case state_get_intensities(State) of
+    [I1, I2 | T] ->
+      Now = os:timestamp(),
+      Fun = fun(E) ->
+                time_passed_in_ms(Now, E) < ?PRUNE_INTENSITY_INTERVAL
+            end,
+      NewIntensities = [I1, I2
+                        | lists:takewhile(Fun, T)],
+      state_set_intensities(State, NewIntensities);
+    _LessThanTwoElements ->
+      State
+  end.
 
 duration_is_exceeded(Duration, TimePassed) ->
   (Duration =/= infinity) andalso (TimePassed >= Duration).
@@ -415,24 +420,25 @@ freq(Intensity) when Intensity == 0 ->
 freq(Intensity) ->
   1 / intensity_ms(Intensity).
 
-calc_current_load([]) -> 0.0;
-calc_current_load(Intensities) ->
-  Period = time_passed_in_ms(os:timestamp(), lists:last(Intensities)),
-  do_calc_current_load(Intensities, Period).
+calc_current_load(State) ->
+  case state_get_intensities(State) of
+    [_, _ | _] ->
+      Intensities = state_get_intensities(State),
+      Period = time_passed_in_ms(hd(Intensities), lists:last(Intensities)),
+      do_calc_current_load(State, Period);
+    _Other ->
+      0.0
+  end.
 
-do_calc_current_load(_Intensities, 0)     -> 0.0;
-do_calc_current_load(Intensities, Period) ->
-  _CurrentLoad = length(Intensities) / Period * 1000.0.
+do_calc_current_load(_State, 0.0)   -> 0.0;
+do_calc_current_load(State, Period) ->
+  Intensities = state_get_intensities(State),
+  _CurrentLoad = min(state_get_intensity(State),(length(Intensities) - 1) / Period * 1000.0).
 
 calc_top_modeled_load(State) ->
   Start = state_get_start(State),
   LoadSpec = state_get_load_spec(State),
-  case Start of
-    undefined ->
-      0.0;
-    Start ->
-      LoadSpec(trunc(time_passed_in_ms(os:timestamp(), Start)))
-  end.
+  LoadSpec(trunc(time_passed_in_ms(os:timestamp(), Start))).
 
 time_passed_in_ms(Now, Then) ->
   timer:now_diff(Now, Then) / 1000.
@@ -495,11 +501,12 @@ state_clear_limit_reported(State) ->
 
 %%%_* EUnit Tests ======================================================
 -ifdef(TEST).
+-ifndef(DIALYZER_RUN).
 
 calc_current_load_test_() ->
-  [ ?_assertEqual(0.0, calc_current_load([]))
-  , ?_assertEqual(0.2, do_calc_current_load([1, 2], 10000))
-  , ?_assertEqual(0.0, do_calc_current_load([1], 0))
+  [ ?_assertEqual(0.0, calc_current_load(#state{intensities=[]}))
+  , ?_assertEqual(0.1, do_calc_current_load(#state{intensities=[1,2]}, 10000.0))
+  , ?_assertEqual(0.0, do_calc_current_load(#state{intensities=[1]}, 0.0))
   ].
 
 duration_is_exceeded_test_() ->
@@ -611,6 +618,7 @@ mk_state(Intensity, TriggerTime) ->
 mk_state(Intensity, TriggerTime, LoadSpec) ->
   (mk_state(Intensity, TriggerTime))#state{load_spec = LoadSpec}.
 
+-endif.
 -endif.
 
 %%%_* Emacs ============================================================

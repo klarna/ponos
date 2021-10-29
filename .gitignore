@@ -5,6 +5,5 @@ doc/edoc-info
 doc/*.html
 doc/*.png
 doc/*.css
-ponos.d
-test/*.beam
-.ponos.plt
+dialyzer.plt
+deps/dialyzer.plt

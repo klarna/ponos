@@ -9,7 +9,16 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   function signature.
 
 ### Changed
-- Use erlang.mk in favour of rebar.
+- Fixed Dialyzer errors.
+
+## [1.5.2] 2017-10-10
+### Changed
+- Fix stats for low CPS generators.
+
+
+## [1.5.1] 2017-03-23
+### Changed
+- Fixed type specs for `start/2` callback.
 
 ## [1.5.0] 2015-11-02
 ### Added
@@ -27,7 +36,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - Full history in change log.
 - Improved scheduling of tasks:
     - A bug has been fixed that caused a load generator never to be
-      able to raise its intensity after reporting 0 intensity.      
+      able to raise its intensity after reporting 0 intensity.
     - The load generator process can catch up under high load from
       scheduling delays.
 
